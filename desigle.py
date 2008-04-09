@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 #    DeSiGLE
-#    Copyright (C) 2007 Derek Anderson
+#    Copyright (C) 2008 Derek Anderson
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -22,7 +22,7 @@ from datetime import date, datetime, timedelta
 
 RUN_FROM_DIR = os.path.abspath(os.path.dirname(sys.argv[0])) + '/'
 CURRENT_DIR = os.path.expanduser("~")
-PROGRAM = 'gPapers'
+PROGRAM = 'DeSiGLE'
 SVN_INFO = commands.getoutput('svn info')
 VERSION = ''
 for line in SVN_INFO.split('\n'):
@@ -71,12 +71,13 @@ class MainGUI:
 
     current_file = None
     changed_time = None
+    changed = False
 
     def __init__(self):
         gnome.init(PROGRAM, VERSION)
         self.ui = gtk.glade.XML(RUN_FROM_DIR + 'desigle.glade')
-        main_window = self.ui.get_widget('desigle')
-        main_window.connect("delete-event", lambda x,y: self.exit() )
+        self.main_window = self.ui.get_widget('desigle')
+        self.main_window.connect("delete-event", lambda x,y: self.exit() )
         
         self.init_menu()
         self.init_editor()
@@ -84,7 +85,7 @@ class MainGUI:
 
         thread.start_new_thread( self.watch_editor, () )
 
-        main_window.show()
+        self.main_window.show()
         
         
     def init_menu(self):
@@ -104,11 +105,20 @@ class MainGUI:
         self.editor.modify_font(pangoFont)
         spell = gtkspell.Spell(self.editor)
         spell.set_language("en_US")
-        self.editor.get_buffer().connect('changed', lambda x: self.editor_text_change_event() )
+        self.editor.get_buffer().connect('changed', self.editor_text_change_event )
+        self.editor.get_buffer().connect('mark-set', self.editor_mark_set_event )
         
     
-    def editor_text_change_event(self):
+    def editor_text_change_event(self, buffer):
         self.changed_time = datetime.now()
+        if not self.changed: self.main_window.set_title( self.main_window.get_title()+'*' )
+        self.changed = True
+        iter=buffer.get_iter_at_mark(buffer.get_insert())
+
+
+    def editor_mark_set_event(self, buffer, x, y):
+        iter=buffer.get_iter_at_mark(buffer.get_insert())
+        self.ui.get_widget('label_row_col').set_text( 'line:%i/%i col:%i' % ( iter.get_line(), buffer.get_line_count(), iter.get_line_offset(), ) )
 
 
     def init_pdf_preview_pane(self):
@@ -244,21 +254,27 @@ class MainGUI:
     def open(self):
         global CURRENT_DIR
         os.chdir(CURRENT_DIR)
-        text_buffer = self.editor.get_buffer()
         dialog = gtk.FileChooserDialog(title='Select a TEX file...', parent=None, action=gtk.FILE_CHOOSER_ACTION_OPEN, buttons=(gtk.STOCK_CANCEL,gtk.RESPONSE_CANCEL,gtk.STOCK_OPEN,gtk.RESPONSE_OK), backend=None)
         dialog.set_default_response(gtk.RESPONSE_OK)
         dialog.show_all()
         response = dialog.run()
         if response == gtk.RESPONSE_OK:
             CURRENT_DIR = dialog.get_current_folder()
-            self.current_file = dialog.get_filename()
-            f = open( self.current_file )
-            text_buffer.set_text( f.read() )
-            f.close()
-            
+            self.open_file( dialog.get_filename() )
         dialog.destroy()
+        
+    
+    def open_file(self, filename):
+        text_buffer = self.editor.get_buffer()
+        self.current_file = filename
+        f = open( self.current_file )
+        text_buffer.set_text( f.read() )
+        f.close()
         self.ui.get_widget('menu_save').set_sensitive( self.current_file!=None )
         self.refresh_preview()
+        self.changed = False
+        self.main_window.set_title( PROGRAM +' - '+ self.current_file )
+        
 
 
     def save(self):
@@ -267,6 +283,8 @@ class MainGUI:
         ftex = open( self.current_file, 'w' )
         ftex.write( tex )
         ftex.close()
+        self.changed = False
+        self.main_window.set_title( PROGRAM +' - '+ self.current_file )
         
     
     def watch_editor(self):
@@ -281,6 +299,7 @@ if __name__ == "__main__":
     
     global main_gui
     main_gui = MainGUI()
+    
     gtk.main()
 
 
