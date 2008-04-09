@@ -65,6 +65,16 @@ except:
     print '\tmake'
     print '\tsudo make install'
     sys.exit()
+    
+    
+    
+LATEX_TAGS = {
+    'derek': {
+        'regex': re.compile('derek'),
+        'properties':{'foreground':'blue',},
+    },
+}
+
 
 
 class MainGUI:
@@ -81,6 +91,7 @@ class MainGUI:
         
         self.init_menu()
         self.init_editor()
+        self.init_tags()
         self.init_pdf_preview_pane()
 
         thread.start_new_thread( self.watch_editor, () )
@@ -114,11 +125,41 @@ class MainGUI:
         if not self.changed: self.main_window.set_title( self.main_window.get_title()+'*' )
         self.changed = True
         iter=buffer.get_iter_at_mark(buffer.get_insert())
+        start = buffer.get_iter_at_line( iter.get_line() )
+        end = buffer.get_iter_at_line( iter.get_line()+1 )
+        if iter.get_line()==buffer.get_line_count():
+            end = buffer.get_end_iter()
+#        self.retag( buffer, start, end )
+        self.retag( buffer, buffer.get_start_iter(), buffer.get_end_iter() )
 
 
     def editor_mark_set_event(self, buffer, x, y):
         iter=buffer.get_iter_at_mark(buffer.get_insert())
         self.ui.get_widget('label_row_col').set_text( 'line:%i/%i col:%i' % ( iter.get_line(), buffer.get_line_count(), iter.get_line_offset(), ) )
+        
+    
+    def init_tags(self):
+        tag_table = self.editor.get_buffer().get_tag_table()
+        for tag_name, tag_attr in LATEX_TAGS.iteritems():
+            warn_tag = gtk.TextTag(tag_name)
+            for k,v in tag_attr['properties'].iteritems():
+                warn_tag.set_property(k,v)
+                print 'prop:',k,v
+            tag_table.add(warn_tag)
+        
+    
+        
+    def retag( self, buffer, start, end ):
+        for tag_name, tag_attr in LATEX_TAGS.iteritems():
+            buffer.remove_tag_by_name(tag_name, start, end)
+            p = tag_attr['regex']
+            line = start.get_text(end)
+            for match in p.finditer(line):
+                print 'applying:', tag_name, match.span()
+                st = buffer.get_iter_at_offset( start.get_offset()+ match.span()[0] )
+                et = buffer.get_iter_at_offset( start.get_offset()+ match.span()[1] )
+                buffer.apply_tag_by_name( tag_name, st, et )
+        
 
 
     def init_pdf_preview_pane(self):
@@ -233,7 +274,7 @@ class MainGUI:
         output = child_stdout.read()
         child_stdout.close()
         os.chdir(CURRENT_DIR)
-        print output
+        #print output
         
         self.refresh_pdf_preview_pane()
         self.changed_time = None
