@@ -1,0 +1,287 @@
+#!/usr/bin/env python
+
+#    DeSiGLE
+#    Copyright (C) 2007 Derek Anderson
+#
+#    This program is free software; you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation; either version 2 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License along
+#    with this program; if not, write to the Free Software Foundation, Inc.,
+#    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+
+import commands, dircache, getopt, math, os, re, string, sys, tempfile, thread, threading, time, traceback
+from datetime import date, datetime, timedelta
+
+RUN_FROM_DIR = os.path.abspath(os.path.dirname(sys.argv[0])) + '/'
+CURRENT_DIR = os.path.expanduser("~")
+PROGRAM = 'gPapers'
+SVN_INFO = commands.getoutput('svn info')
+VERSION = ''
+for line in SVN_INFO.split('\n'):
+    if line.startswith('Revision:'):
+        VERSION = 'svn:'+ line[10:]
+
+GPL = open( RUN_FROM_DIR + 'GPL.txt', 'r' ).read()
+
+# GUI imports
+try:
+    import pygtk
+    pygtk.require("2.0")
+    import gobject
+    import gtkspell 
+    import gtk
+    import gtk.glade
+    import gnome
+    import gnome.ui
+    import pango
+    gobject.threads_init()
+    gtk.gdk.threads_init()
+except:
+    traceback.print_exc()
+    print 'could not import required GTK libraries.  try running:'
+    print '\tfor ubuntu: sudo apt-get install python python-glade2 python-gnome2 python-gconf python-gnome2-extras'
+    print '\tfor debian: sudo apt-get install python python-glade2 python-gnome2 python-gnome2-extras'
+    print '\tfor redhat: yum install pygtk2 gnome-python2-gconf pygtk2-libglade python-gnome2-extras'
+    sys.exit()
+
+try:
+    import poppler
+except:
+    traceback.print_exc()
+    print 'could not import python-poppler [https://code.launchpad.net/~poppler-python/poppler-python/].  try running (from "%s"):' % RUN_FROM_DIR
+    print "\tsudo apt-get install build-essential libpoppler2 libpoppler-dev libpoppler-glib2 libpoppler-glib-dev python-cairo-dev bzr gnome-common python-dev python-gnome2-dev python-gtk2-dev python-gobject-dev python-pyorbit-dev"
+    print '\tbzr branch http://bazaar.launchpad.net/~poppler-python/poppler-python/poppler-0.6-experimental'
+    print '\tcd poppler-0.6-experimental'
+    print '\t./autogen.sh'
+    print '\t./configure'
+    print '\tmake'
+    print '\tsudo make install'
+    sys.exit()
+
+
+class MainGUI:
+
+    current_file = None
+    changed_time = None
+
+    def __init__(self):
+        gnome.init(PROGRAM, VERSION)
+        self.ui = gtk.glade.XML(RUN_FROM_DIR + 'desigle.glade')
+        main_window = self.ui.get_widget('desigle')
+        main_window.connect("delete-event", lambda x,y: self.exit() )
+        
+        self.init_menu()
+        self.init_editor()
+        self.init_pdf_preview_pane()
+
+        thread.start_new_thread( self.watch_editor, () )
+
+        main_window.show()
+        
+        
+    def init_menu(self):
+        self.ui.get_widget('menu_refresh_preview').connect('activate', lambda x: self.refresh_preview())
+        self.ui.get_widget('menu_new').connect('activate', lambda x: self.new())
+        self.ui.get_widget('menu_open').connect('activate', lambda x: self.open())
+        self.ui.get_widget('menu_save').connect('activate', lambda x: self.save())
+        self.ui.get_widget('menu_save_as').connect('activate', lambda x: self.save_as())
+        self.ui.get_widget('menu_quit').connect('activate', lambda x: self.exit())
+        
+        self.ui.get_widget('menu_save').set_sensitive( self.current_file!=None )
+        
+        
+    def init_editor(self):
+        self.editor = self.ui.get_widget('editor')
+        pangoFont = pango.FontDescription('monospace')
+        self.editor.modify_font(pangoFont)
+        spell = gtkspell.Spell(self.editor)
+        spell.set_language("en_US")
+        self.editor.get_buffer().connect('changed', lambda x: self.editor_text_change_event() )
+        
+    
+    def editor_text_change_event(self):
+        self.changed_time = datetime.now()
+
+
+    def init_pdf_preview_pane(self):
+        file, self.tex_file = tempfile.mkstemp('.tex')
+        self.pdf_file = self.tex_file[:-4]+'.pdf'
+        print 'tex_file', self.tex_file
+        print 'pdf_file', self.pdf_file
+
+        pdf_preview = self.ui.get_widget('pdf_preview')
+        self.pdf_preview = { 'current_page_number':0 }
+        self.pdf_preview['scale'] = None
+        pdf_preview.connect("expose-event", self.on_expose_pdf_preview)
+        
+        self.ui.get_widget('button_move_previous_page').connect('clicked', lambda x: self.goto_pdf_page( self.pdf_preview['current_page_number']-1 ) )
+        self.ui.get_widget('button_move_next_page').connect('clicked', lambda x: self.goto_pdf_page( self.pdf_preview['current_page_number']+1 ) )
+        self.ui.get_widget('button_zoom_in').connect('clicked', lambda x: self.zoom_pdf_page( -1.2 ) )
+        self.ui.get_widget('button_zoom_out').connect('clicked', lambda x: self.zoom_pdf_page( -.8 ) )
+        self.ui.get_widget('button_zoom_normal').connect('clicked', lambda x: self.zoom_pdf_page( 1 ) )
+        self.ui.get_widget('button_zoom_best_fit').connect('clicked', lambda x: self.zoom_pdf_page( None ) )
+
+    def refresh_pdf_preview_pane(self):
+        pdf_preview = self.ui.get_widget('pdf_preview')
+        
+        if os.path.isfile( self.pdf_file ):
+            self.pdf_preview['document'] = poppler.document_new_from_file ('file://'+ self.pdf_file, None)
+            self.pdf_preview['n_pages'] = self.pdf_preview['document'].get_n_pages()
+            self.pdf_preview['scale'] = None
+            self.goto_pdf_page( self.pdf_preview['current_page_number'], new_doc=True )
+        else:
+            pdf_preview.set_size_request(0,0)
+            self.pdf_preview['current_page'] = None
+            self.ui.get_widget('button_move_previous_page').set_sensitive( False )
+            self.ui.get_widget('button_move_next_page').set_sensitive( False )
+            self.ui.get_widget('button_zoom_out').set_sensitive( False )
+            self.ui.get_widget('button_zoom_in').set_sensitive( False )
+            self.ui.get_widget('button_zoom_normal').set_sensitive( False )
+            self.ui.get_widget('button_zoom_best_fit').set_sensitive( False )
+        pdf_preview.queue_draw()
+        
+    def goto_pdf_page(self, page_number, new_doc=False):
+        if True:
+            if not new_doc and self.pdf_preview.get('current_page') and self.pdf_preview['current_page_number']==page_number:
+                return
+            if page_number<0: page_number = 0
+            pdf_preview = self.ui.get_widget('pdf_preview')
+            self.pdf_preview['current_page_number'] = page_number
+            self.pdf_preview['current_page'] = self.pdf_preview['document'].get_page( self.pdf_preview['current_page_number'] )
+            if self.pdf_preview['current_page']:
+                self.pdf_preview['width'], self.pdf_preview['height'] = self.pdf_preview['current_page'].get_size()
+                self.ui.get_widget('button_move_previous_page').set_sensitive( page_number>0 )
+                self.ui.get_widget('button_move_next_page').set_sensitive( page_number<self.pdf_preview['n_pages']-1 )
+                self.zoom_pdf_page( self.pdf_preview['scale'], redraw=False )
+            else:
+                self.ui.get_widget('button_move_previous_page').set_sensitive( False )
+                self.ui.get_widget('button_move_next_page').set_sensitive( False )
+            pdf_preview.queue_draw()
+        else:
+            self.ui.get_widget('button_move_previous_page').set_sensitive( False )
+            self.ui.get_widget('button_move_next_page').set_sensitive( False )
+
+    def zoom_pdf_page(self, scale, redraw=True):
+        """None==auto-size, negative means relative, positive means fixed"""
+        if True:
+            if redraw and self.pdf_preview.get('current_page') and self.pdf_preview['scale']==scale:
+                return
+            pdf_preview = self.ui.get_widget('pdf_preview')
+            auto_scale = (pdf_preview.get_parent().get_allocation().width-2.0) / self.pdf_preview['width']
+            if scale==None:
+                scale = auto_scale
+            else:
+                if scale<0:
+                    if self.pdf_preview['scale']==None: self.pdf_preview['scale'] = auto_scale
+                    scale = self.pdf_preview['scale'] = self.pdf_preview['scale'] * -scale
+                else:
+                    self.pdf_preview['scale'] = scale
+            pdf_preview.set_size_request(int(self.pdf_preview['width']*scale), int(self.pdf_preview['height']*scale))
+            self.ui.get_widget('button_zoom_out').set_sensitive( scale>0.3 )
+            self.ui.get_widget('button_zoom_in').set_sensitive( True )
+            self.ui.get_widget('button_zoom_normal').set_sensitive( True )
+            self.ui.get_widget('button_zoom_best_fit').set_sensitive( True )
+            if redraw: pdf_preview.queue_draw()
+            return scale
+        else:
+            pass
+        
+    def on_expose_pdf_preview(self, widget, event):
+        if not self.pdf_preview.get('current_page'): return
+        cr = widget.window.cairo_create()
+        cr.set_source_rgb(1, 1, 1)
+        scale = self.pdf_preview['scale']
+        if scale==None:
+            scale = (self.ui.get_widget('pdf_preview').get_parent().get_allocation().width-2.0) / self.pdf_preview['width']
+        if scale != 1:
+            cr.scale(scale, scale)
+        cr.rectangle(0, 0, self.pdf_preview['width'], self.pdf_preview['height'])
+        cr.fill()
+        self.pdf_preview['current_page'].render(cr)
+
+
+    def refresh_preview(self):
+        if os.path.isfile( self.pdf_file ): os.remove( self.pdf_file )
+
+        text_buffer = self.editor.get_buffer()
+        tex = text_buffer.get_text( text_buffer.get_start_iter(), text_buffer.get_end_iter() )
+        ftex = open( self.tex_file, 'w' )
+        ftex.write( tex )
+        ftex.close()
+        
+        os.chdir('/tmp')
+        child_stdin, child_stdout = os.popen2( 'pdflatex -file-line-error-style -src-specials -halt-on-error "%s"' % self.tex_file )
+        child_stdin.close()
+        output = child_stdout.read()
+        child_stdout.close()
+        os.chdir(CURRENT_DIR)
+        print output
+        
+        self.refresh_pdf_preview_pane()
+        self.changed_time = None
+        
+    def exit(self):
+        if os.path.isfile( self.tex_file ): os.remove( self.tex_file )
+        if os.path.isfile( self.pdf_file ): os.remove( self.pdf_file )
+        sys.exit(0)
+        
+
+    def new(self):
+        text_buffer = self.editor.get_buffer()
+        self.current_file = None
+        text_buffer.set_text('')
+        self.ui.get_widget('menu_save').set_sensitive( self.current_file!=None )
+
+
+    def open(self):
+        global CURRENT_DIR
+        os.chdir(CURRENT_DIR)
+        text_buffer = self.editor.get_buffer()
+        dialog = gtk.FileChooserDialog(title='Select a TEX file...', parent=None, action=gtk.FILE_CHOOSER_ACTION_OPEN, buttons=(gtk.STOCK_CANCEL,gtk.RESPONSE_CANCEL,gtk.STOCK_OPEN,gtk.RESPONSE_OK), backend=None)
+        dialog.set_default_response(gtk.RESPONSE_OK)
+        dialog.show_all()
+        response = dialog.run()
+        if response == gtk.RESPONSE_OK:
+            CURRENT_DIR = dialog.get_current_folder()
+            self.current_file = dialog.get_filename()
+            f = open( self.current_file )
+            text_buffer.set_text( f.read() )
+            f.close()
+            
+        dialog.destroy()
+        self.ui.get_widget('menu_save').set_sensitive( self.current_file!=None )
+        self.refresh_preview()
+
+
+    def save(self):
+        text_buffer = self.editor.get_buffer()
+        tex = text_buffer.get_text( text_buffer.get_start_iter(), text_buffer.get_end_iter() )
+        ftex = open( self.current_file, 'w' )
+        ftex.write( tex )
+        ftex.close()
+        
+    
+    def watch_editor(self):
+        while True:
+            if self.changed_time: # and (datetime.now() - self.changed_time).seconds > 2:
+                print 'updating...'
+                self.refresh_preview()
+            time.sleep(1)
+
+
+if __name__ == "__main__":
+    
+    global main_gui
+    main_gui = MainGUI()
+    gtk.main()
+
+
+
