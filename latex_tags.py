@@ -3,7 +3,7 @@ import re
 LATEX_TAGS = [
     ('math', {
         'regex': re.compile('\$.*\$'),
-        'properties':{'foreground':'#008800',},
+        'properties':{'foreground':'#006600',},
     }),
     ('command', {
         'regex': re.compile('[\\\\]\\w*[\\\\]?'),
