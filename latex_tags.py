@@ -2,7 +2,7 @@ import re
 
 LATEX_TAGS = [
     ('math', {
-        'regex': re.compile('\$.*\$'),
+        'regex': re.compile('\$.*?\$'),
         'properties':{'foreground':'#006600',},
     }),
     ('command', {
@@ -14,7 +14,7 @@ LATEX_TAGS = [
         'properties':{'foreground':'#888888',},
     }),
     ('bracket_contents', {
-        'regex': re.compile('[{}[\]].*?[{}[\]]'),
+        'regex': re.compile('[{}[\]].*?[^\\\\][{}[\]]'),
         'properties':{'foreground':'#440088',},
     }),
     ('bracket', {

@@ -147,9 +147,11 @@ class MainGUI:
         
     def retag( self, buffer, start, end ):
         for tag_name, tag_attr in LATEX_TAGS:
-            buffer.remove_tag_by_name(tag_name, start, end)
+            #buffer.remove_tag_by_name(tag_name, start, end)
+            buffer.remove_tag_by_name(tag_name, buffer.get_start_iter(), buffer.get_end_iter())
             p = tag_attr['regex']
-            line = start.get_text(end)
+            #line = start.get_text(end)
+            line = buffer.get_text( buffer.get_start_iter(), buffer.get_end_iter() )
             for match in p.finditer(line):
                 st = buffer.get_iter_at_offset( start.get_offset()+ match.span()[0] )
                 et = buffer.get_iter_at_offset( start.get_offset()+ match.span()[1] )
@@ -360,9 +362,11 @@ class MainGUI:
     def watch_editor(self):
         while True:
             if self.changed_time: # and (datetime.now() - self.changed_time).seconds > 2:
+                gtk.gdk.threads_enter()
                 text_buffer = self.editor.get_buffer()
                 self.retag( text_buffer, text_buffer.get_start_iter(), text_buffer.get_end_iter() )
                 self.refresh_preview()
+                gtk.gdk.threads_leave()
             time.sleep(1)
 
 
