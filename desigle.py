@@ -112,6 +112,7 @@ class MainGUI:
         self.editor = self.ui.get_widget('editor')
         pangoFont = pango.FontDescription('monospace')
         self.editor.modify_font(pangoFont)
+        self.ui.get_widget('textview_output').modify_font(pangoFont)
         spell = gtkspell.Spell(self.editor)
         spell.set_language("en_US")
         self.editor.get_buffer().connect('changed', self.editor_text_change_event )
@@ -174,6 +175,7 @@ class MainGUI:
         self.ui.get_widget('button_zoom_out').connect('clicked', lambda x: self.zoom_pdf_page( -.8 ) )
         self.ui.get_widget('button_zoom_normal').connect('clicked', lambda x: self.zoom_pdf_page( 1 ) )
         self.ui.get_widget('button_zoom_best_fit').connect('clicked', lambda x: self.zoom_pdf_page( None ) )
+        self.ui.get_widget('button_save_pdf').connect('clicked', lambda x: self.save_pdf() )
 
     def refresh_pdf_preview_pane(self):
         pdf_preview = self.ui.get_widget('pdf_preview')
@@ -269,7 +271,7 @@ class MainGUI:
         output = child_stdout.read()
         child_stdout.close()
         os.chdir(CURRENT_DIR)
-        print output
+        self.ui.get_widget('textview_output').get_buffer().set_text(output)
         
         self.refresh_pdf_preview_pane()
         self.changed_time = None
@@ -344,10 +346,21 @@ class MainGUI:
         self.main_window.set_title( PROGRAM +' - '+ self.current_file )
         
     
+    def save_pdf(self):
+        o_filename = self.current_file
+        if o_filename.endswith('.tex'):
+            o_filename = o_filename[:-4]
+        o_filename = o_filename +'.pdf'
+        
+        child_stdin, child_stdout = os.popen2( 'cp "%s" "%s"' % (self.pdf_file, o_filename) )
+        child_stdin.close()
+        output = child_stdout.read()
+        child_stdout.close()
+        
+    
     def watch_editor(self):
         while True:
             if self.changed_time: # and (datetime.now() - self.changed_time).seconds > 2:
-                print 'updating...'
                 text_buffer = self.editor.get_buffer()
                 self.retag( text_buffer, text_buffer.get_start_iter(), text_buffer.get_end_iter() )
                 self.refresh_preview()
