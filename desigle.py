@@ -371,7 +371,7 @@ if __name__ == "__main__":
     global main_gui
     main_gui = MainGUI()
     
-    if sys.argv[1] and os.path.isfile( sys.argv[1] ):
+    if len(sys.argv)>1 and sys.argv[1] and os.path.isfile( sys.argv[1] ):
         main_gui.open_file(sys.argv[1])
     
     gtk.main()
