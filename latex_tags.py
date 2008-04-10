@@ -26,3 +26,11 @@ LATEX_TAGS = [
         'properties':{'foreground':'#888800',},
     }),
 ]
+
+
+BLANK_DOCUMENT = """\\documentclass{article}
+\\begin{document}
+
+\\centerline{\\large Welcome to DeSiGLE: Derek's Simple Gnome \\LaTeX\\ Editor! }
+
+\\end{document}"""

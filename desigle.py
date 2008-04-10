@@ -285,10 +285,12 @@ class MainGUI:
 
     def new(self):
         text_buffer = self.editor.get_buffer()
-        self.current_file = None
-        text_buffer.set_text('')
+        text_buffer.set_text(BLANK_DOCUMENT)
         self.ui.get_widget('menu_save').set_sensitive( self.current_file!=None )
         self.ui.get_widget('toolbutton_save').set_sensitive( self.current_file!=None )
+        self.main_window.set_title( PROGRAM +' - untitled' )
+        self.current_file = None
+        self.changed = False
 
 
     def open(self):
@@ -378,6 +380,8 @@ if __name__ == "__main__":
     
     if len(sys.argv)>1 and sys.argv[1] and os.path.isfile( sys.argv[1] ):
         main_gui.open_file(sys.argv[1])
+    else:
+        main_gui.new()
     
     gtk.main()
 
