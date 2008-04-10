@@ -345,6 +345,7 @@ class MainGUI:
         ftex.close()
         self.changed = False
         self.main_window.set_title( PROGRAM +' - '+ self.current_file )
+        self.save_pdf()
         
     
     def save_pdf(self):
@@ -361,13 +362,13 @@ class MainGUI:
     
     def watch_editor(self):
         while True:
-            if self.changed_time: # and (datetime.now() - self.changed_time).seconds > 2:
+            if self.changed_time and (datetime.now() - self.changed_time).seconds >= 1:
                 gtk.gdk.threads_enter()
                 text_buffer = self.editor.get_buffer()
                 self.retag( text_buffer, text_buffer.get_start_iter(), text_buffer.get_end_iter() )
                 self.refresh_preview()
                 gtk.gdk.threads_leave()
-            time.sleep(1)
+            time.sleep(.5)
 
 
 if __name__ == "__main__":
