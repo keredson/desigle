@@ -92,7 +92,6 @@ class MainGUI:
         
         
     def init_menu(self):
-        self.ui.get_widget('menu_refresh_preview').connect('activate', lambda x: self.refresh_preview())
         self.ui.get_widget('menu_new').connect('activate', lambda x: self.new())
         self.ui.get_widget('menu_open').connect('activate', lambda x: self.open())
         self.ui.get_widget('menu_save').connect('activate', lambda x: self.save())
