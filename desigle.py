@@ -19,7 +19,6 @@
 
 import commands, dircache, getopt, math, os, re, string, sys, tempfile, thread, threading, time, traceback
 from datetime import date, datetime, timedelta
-from latex_tags import *
 
 RUN_FROM_DIR = os.path.abspath(os.path.dirname(sys.argv[0])) + '/'
 CURRENT_DIR = os.path.expanduser("~")
@@ -68,12 +67,15 @@ except:
     sys.exit()
 
 
+from latex_tags import *
+
 
 class MainGUI:
 
     current_file = None
     changed_time = None
     changed = False
+    errors = []
 
     def __init__(self):
         gnome.init(PROGRAM, VERSION)
@@ -156,6 +158,13 @@ class MainGUI:
                 st = buffer.get_iter_at_offset( start.get_offset()+ match.span()[0] )
                 et = buffer.get_iter_at_offset( start.get_offset()+ match.span()[1] )
                 buffer.apply_tag_by_name( tag_name, st, et )
+        
+        for line_number, error in self.errors:
+            st = buffer.get_iter_at_line(line_number-1)
+            chars_in_line = st.get_chars_in_line()
+            et = buffer.get_iter_at_line(line_number)
+            buffer.apply_tag_by_name( 'latex_error', st, et )
+            print st.get_offset(), et.get_offset(), error
         
 
 
@@ -255,6 +264,16 @@ class MainGUI:
         cr.rectangle(0, 0, self.pdf_preview['width'], self.pdf_preview['height'])
         cr.fill()
         self.pdf_preview['current_page'].render(cr)
+        
+        
+    def highlight_errors(self, output):
+        print 'woot', self.tex_file
+        self.errors = []
+        for line in output.split('\n'):
+            if line.startswith( self.tex_file ):
+                line_number = int( line[ len(self.tex_file)+1 : line.find(':', line.find(':')+1) ] )
+                line = line[ line.find(':', line.find(':')+1)+1 :]
+                self.errors.append( ( line_number, line ) )
 
 
     def refresh_preview(self):
@@ -273,6 +292,8 @@ class MainGUI:
         child_stdout.close()
         os.chdir(CURRENT_DIR)
         self.ui.get_widget('textview_output').get_buffer().set_text(output)
+        
+        self.highlight_errors(output)
         
         self.refresh_pdf_preview_pane()
         self.changed_time = None
@@ -322,6 +343,7 @@ class MainGUI:
         self.changed = False
         self.main_window.set_title( PROGRAM +' - '+ self.current_file )
         self.retag( text_buffer, text_buffer.get_start_iter(), text_buffer.get_end_iter() )
+        text_buffer.place_cursor( text_buffer.get_start_iter() )
         
 
 
@@ -367,8 +389,8 @@ class MainGUI:
             if self.changed_time and (datetime.now() - self.changed_time).seconds >= 1:
                 gtk.gdk.threads_enter()
                 text_buffer = self.editor.get_buffer()
-                self.retag( text_buffer, text_buffer.get_start_iter(), text_buffer.get_end_iter() )
                 self.refresh_preview()
+                self.retag( text_buffer, text_buffer.get_start_iter(), text_buffer.get_end_iter() )
                 gtk.gdk.threads_leave()
             time.sleep(.5)
 

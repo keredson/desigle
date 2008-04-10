@@ -1,4 +1,4 @@
-import re
+import pango, re
 
 LATEX_TAGS = [
     ('math', {
@@ -11,7 +11,7 @@ LATEX_TAGS = [
     }),
     ('comment', {
         'regex': re.compile('%.*'),
-        'properties':{'foreground':'#888888',},
+        'properties':{'foreground':'#888888','style':pango.STYLE_ITALIC,},
     }),
     ('bracket_contents', {
         'regex': re.compile('[{}[\]].*?[^\\\\][{}[\]]'),
@@ -24,6 +24,10 @@ LATEX_TAGS = [
     ('symbol', {
         'regex': re.compile('[=<>&-]'),
         'properties':{'foreground':'#888800',},
+    }),
+    ('latex_error', {
+        'regex': re.compile('oZooxae4'),
+        'properties':{'background':'#ffdddd',},
     }),
 ]
 
