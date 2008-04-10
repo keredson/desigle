@@ -19,6 +19,7 @@
 
 import commands, dircache, getopt, math, os, re, string, sys, tempfile, thread, threading, time, traceback
 from datetime import date, datetime, timedelta
+from latex_tags import *
 
 RUN_FROM_DIR = os.path.abspath(os.path.dirname(sys.argv[0])) + '/'
 CURRENT_DIR = os.path.expanduser("~")
@@ -65,23 +66,6 @@ except:
     print '\tmake'
     print '\tsudo make install'
     sys.exit()
-    
-    
-    
-LATEX_TAGS = [
-    ('math', {
-        'regex': re.compile('\$.*\$'),
-        'properties':{'foreground':'dark green',},
-    }),
-    ('command', {
-        'regex': re.compile('[\\\\]\\w+'),
-        'properties':{'foreground':'blue',},
-    }),
-    ('c_bracket', {
-        'regex': re.compile('[{}]'),
-        'properties':{'foreground':'red',},
-    }),
-]
 
 
 
@@ -117,6 +101,12 @@ class MainGUI:
         
         self.ui.get_widget('menu_save').set_sensitive( self.current_file!=None )
         
+        self.ui.get_widget('toolbutton_new').connect('clicked', lambda x: self.new())
+        self.ui.get_widget('toolbutton_open').connect('clicked', lambda x: self.open())
+        self.ui.get_widget('toolbutton_save').connect('clicked', lambda x: self.save())
+
+        self.ui.get_widget('toolbutton_save').set_sensitive( self.current_file!=None )
+
         
     def init_editor(self):
         self.editor = self.ui.get_widget('editor')
@@ -138,12 +128,11 @@ class MainGUI:
 #        if iter.get_line()>=buffer.get_line_count()-1:
 #            end = buffer.get_end_iter()
 #        self.retag( buffer, start, end )
-        self.retag( buffer, buffer.get_start_iter(), buffer.get_end_iter() )
 
 
     def editor_mark_set_event(self, buffer, x, y):
         iter=buffer.get_iter_at_mark(buffer.get_insert())
-        self.ui.get_widget('label_row_col').set_text( 'line:%i/%i col:%i' % ( iter.get_line(), buffer.get_line_count(), iter.get_line_offset(), ) )
+        self.ui.get_widget('label_row_col').set_text( 'line:%i/%i col:%i/%i' % ( iter.get_line(), buffer.get_line_count(), iter.get_line_offset(), iter.get_chars_in_line() ) )
         
     
     def init_tags(self):
@@ -296,6 +285,7 @@ class MainGUI:
         self.current_file = None
         text_buffer.set_text('')
         self.ui.get_widget('menu_save').set_sensitive( self.current_file!=None )
+        self.ui.get_widget('toolbutton_save').set_sensitive( self.current_file!=None )
 
 
     def open(self):
@@ -307,21 +297,26 @@ class MainGUI:
         response = dialog.run()
         if response == gtk.RESPONSE_OK:
             CURRENT_DIR = dialog.get_current_folder()
-            self.open_file( dialog.get_filename() )
+            filename = dialog.get_filename()
+            self.open_file( filename )
         dialog.destroy()
         
     
     def open_file(self, filename):
+        if not os.path.isfile(filename):
+            self.new()
+            return
         text_buffer = self.editor.get_buffer()
         self.current_file = filename
         f = open( self.current_file )
         text_buffer.set_text( f.read() )
         f.close()
         self.ui.get_widget('menu_save').set_sensitive( self.current_file!=None )
+        self.ui.get_widget('toolbutton_save').set_sensitive( self.current_file!=None )
         self.refresh_preview()
         self.changed = False
         self.main_window.set_title( PROGRAM +' - '+ self.current_file )
-        self.retag( buffer, buffer.get_start_iter(), buffer.get_end_iter() )
+        self.retag( text_buffer, text_buffer.get_start_iter(), text_buffer.get_end_iter() )
         
 
 
@@ -353,6 +348,8 @@ class MainGUI:
         while True:
             if self.changed_time: # and (datetime.now() - self.changed_time).seconds > 2:
                 print 'updating...'
+                text_buffer = self.editor.get_buffer()
+                self.retag( text_buffer, text_buffer.get_start_iter(), text_buffer.get_end_iter() )
                 self.refresh_preview()
             time.sleep(1)
 
@@ -361,6 +358,9 @@ if __name__ == "__main__":
     
     global main_gui
     main_gui = MainGUI()
+    
+    if sys.argv[1] and os.path.isfile( sys.argv[1] ):
+        main_gui.open_file(sys.argv[1])
     
     gtk.main()
 
