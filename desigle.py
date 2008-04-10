@@ -68,12 +68,20 @@ except:
     
     
     
-LATEX_TAGS = {
-    'derek': {
-        'regex': re.compile('derek'),
+LATEX_TAGS = [
+    ('math', {
+        'regex': re.compile('\$.*\$'),
+        'properties':{'foreground':'dark green',},
+    }),
+    ('command', {
+        'regex': re.compile('[\\\\]\\w+'),
         'properties':{'foreground':'blue',},
-    },
-}
+    }),
+    ('c_bracket', {
+        'regex': re.compile('[{}]'),
+        'properties':{'foreground':'red',},
+    }),
+]
 
 
 
@@ -124,11 +132,11 @@ class MainGUI:
         self.changed_time = datetime.now()
         if not self.changed: self.main_window.set_title( self.main_window.get_title()+'*' )
         self.changed = True
-        iter=buffer.get_iter_at_mark(buffer.get_insert())
-        start = buffer.get_iter_at_line( iter.get_line() )
-        end = buffer.get_iter_at_line( iter.get_line()+1 )
-        if iter.get_line()==buffer.get_line_count():
-            end = buffer.get_end_iter()
+#        iter=buffer.get_iter_at_mark(buffer.get_insert())
+#        start = buffer.get_iter_at_line( iter.get_line() )
+#        end = buffer.get_iter_at_line( iter.get_line()+1 )
+#        if iter.get_line()>=buffer.get_line_count()-1:
+#            end = buffer.get_end_iter()
 #        self.retag( buffer, start, end )
         self.retag( buffer, buffer.get_start_iter(), buffer.get_end_iter() )
 
@@ -140,22 +148,20 @@ class MainGUI:
     
     def init_tags(self):
         tag_table = self.editor.get_buffer().get_tag_table()
-        for tag_name, tag_attr in LATEX_TAGS.iteritems():
+        for tag_name, tag_attr in LATEX_TAGS:
             warn_tag = gtk.TextTag(tag_name)
             for k,v in tag_attr['properties'].iteritems():
                 warn_tag.set_property(k,v)
-                print 'prop:',k,v
             tag_table.add(warn_tag)
         
     
         
     def retag( self, buffer, start, end ):
-        for tag_name, tag_attr in LATEX_TAGS.iteritems():
+        for tag_name, tag_attr in LATEX_TAGS:
             buffer.remove_tag_by_name(tag_name, start, end)
             p = tag_attr['regex']
             line = start.get_text(end)
             for match in p.finditer(line):
-                print 'applying:', tag_name, match.span()
                 st = buffer.get_iter_at_offset( start.get_offset()+ match.span()[0] )
                 et = buffer.get_iter_at_offset( start.get_offset()+ match.span()[1] )
                 buffer.apply_tag_by_name( tag_name, st, et )
@@ -274,7 +280,7 @@ class MainGUI:
         output = child_stdout.read()
         child_stdout.close()
         os.chdir(CURRENT_DIR)
-        #print output
+        print output
         
         self.refresh_pdf_preview_pane()
         self.changed_time = None
@@ -315,9 +321,24 @@ class MainGUI:
         self.refresh_preview()
         self.changed = False
         self.main_window.set_title( PROGRAM +' - '+ self.current_file )
+        self.retag( buffer, buffer.get_start_iter(), buffer.get_end_iter() )
         
 
 
+    def save_as(self):
+        global CURRENT_DIR
+        os.chdir(CURRENT_DIR)
+        dialog = gtk.FileChooserDialog(title='Save TEX file...', parent=None, action=gtk.FILE_CHOOSER_ACTION_SAVE, buttons=(gtk.STOCK_CANCEL,gtk.RESPONSE_CANCEL,gtk.STOCK_SAVE,gtk.RESPONSE_OK), backend=None)
+        dialog.set_default_response(gtk.RESPONSE_OK)
+        dialog.show_all()
+        response = dialog.run()
+        if response == gtk.RESPONSE_OK:
+            CURRENT_DIR = dialog.get_current_folder()
+            self.current_file = dialog.get_filename()
+            self.save()
+        dialog.destroy()
+        
+    
     def save(self):
         text_buffer = self.editor.get_buffer()
         tex = text_buffer.get_text( text_buffer.get_start_iter(), text_buffer.get_end_iter() )
