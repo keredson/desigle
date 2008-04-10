@@ -160,14 +160,12 @@ class MainGUI:
                 buffer.apply_tag_by_name( tag_name, st, et )
         
         for line_number, error in self.errors:
-            st = buffer.get_iter_at_line(line_number)
-            chars_in_line = st.get_chars_in_line()
-            print 'chars_in_line', chars_in_line
-            if chars_in_line>1:
-                et = buffer.get_iter_at_line(line_number+1)
-            else:
-                st = buffer.get_iter_at_line(line_number-1)
-                et = buffer.get_iter_at_line(line_number)
+            tmp = line_number-1
+            st = buffer.get_iter_at_line(tmp)
+            while st.get_chars_in_line()<=1:
+                tmp +=1 
+                st = buffer.get_iter_at_line(tmp) 
+            et = buffer.get_iter_at_line(tmp+1)
             buffer.apply_tag_by_name( 'latex_error', st, et )
             print line_number, st.get_offset(), et.get_offset(), error
         
