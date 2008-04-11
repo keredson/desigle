@@ -79,6 +79,8 @@ class MainGUI:
     changed_time = None
     changed = False
     errors = []
+    undo_stack = []
+    record_operations = True
 
     def __init__(self):
         gnome.init(PROGRAM, VERSION)
@@ -123,18 +125,77 @@ class MainGUI:
         spell.set_language("en_US")
         self.editor.get_buffer().connect('changed', self.editor_text_change_event )
         self.editor.get_buffer().connect('mark-set', self.editor_mark_set_event )
+        self.editor.get_buffer().connect('insert-text', self.editor_insert_text_event )
+        self.editor.get_buffer().connect('delete-range', self.editor_delete_range_event )
+        
+        # undo/redo
+        accelgroup = gtk.AccelGroup()
+        actiongroup = gtk.ActionGroup('SimpleAction')
+        self.main_window.add_accel_group(accelgroup)
+        undo_action = gtk.Action('undo_action', None, None, gtk.STOCK_UNDO)
+        undo_action.connect('activate', lambda x: self.editor_undo())
+        actiongroup.add_action_with_accel(undo_action, '<Control>z')
+        undo_action.set_accel_group(accelgroup)
+        undo_action.connect_accelerator()
+        undo_action.connect_proxy(self.ui.get_widget('menu_undo'))
+        redo_action = gtk.Action('redo_action', None, None, gtk.STOCK_REDO)
+        redo_action.connect('activate', self.echo)
+        actiongroup.add_action_with_accel(redo_action, '<Control>y')
+        redo_action.set_accel_group(accelgroup)
+        redo_action.connect_accelerator()
+        redo_action.connect_proxy(self.ui.get_widget('menu_redo'))
+        self.ui.get_widget('menu_undo').set_sensitive(False)
+        self.ui.get_widget('menu_redo').set_sensitive(False)
         
     
+    def echo(self, a=None, b=None, c=None, d=None, e=None ):
+        print 'a, b, c, d, e', a, b, c, d, e
+        
+        
     def editor_text_change_event(self, buffer):
         self.changed_time = datetime.now()
         if not self.changed: self.main_window.set_title( self.main_window.get_title()+'*' )
+        self.ui.get_widget('menu_undo').set_sensitive( len(self.undo_stack)>0 )
         self.changed = True
-#        iter=buffer.get_iter_at_mark(buffer.get_insert())
-#        start = buffer.get_iter_at_line( iter.get_line() )
-#        end = buffer.get_iter_at_line( iter.get_line()+1 )
-#        if iter.get_line()>=buffer.get_line_count()-1:
-#            end = buffer.get_end_iter()
-#        self.retag( buffer, start, end )
+
+
+    def editor_insert_text_event(self, buffer, start, text, length):
+        if not self.record_operations: return
+        start_mark = buffer.create_mark(None, start, True)
+        self.undo_stack.append( ('insert_text', buffer, start_mark, text, length) )
+        self.prune_undo_stack()
+
+
+    def editor_delete_range_event(self, buffer, start, end):
+        if not self.record_operations: return
+        start_mark = buffer.create_mark(None, start, False)
+        text = buffer.get_text( start, end )
+        self.undo_stack.append( ('delete_range', buffer, start_mark, text) )
+        self.prune_undo_stack()
+        
+    def prune_undo_stack(self):
+        while len(self.undo_stack)>512:
+            action = self.undo_stack.pop(0)
+            action[1].delete_mark(action[2])
+            
+        
+    def editor_undo(self):
+        if not self.undo_stack: return
+        self.record_operations = False
+        action = self.undo_stack.pop()
+        if action[0]=='insert_text':
+            buffer = action[1]
+            start = buffer.get_iter_at_mark(action[2])
+            end = buffer.get_iter_at_offset( start.get_offset()+action[4] )
+            buffer.delete( start, end )
+            buffer.delete_mark(action[2])
+        if action[0]=='delete_range':
+            buffer = action[1]
+            start = buffer.get_iter_at_mark(action[2])
+            text = action[3]
+            buffer.insert( start, text )
+        self.record_operations = True
+        self.ui.get_widget('menu_undo').set_sensitive( len(self.undo_stack)>0 )
 
 
     def editor_mark_set_event(self, buffer, x, y):
@@ -343,7 +404,9 @@ class MainGUI:
         text_buffer = self.editor.get_buffer()
         self.current_file = filename
         f = open( self.current_file )
+        self.record_operations = False
         text_buffer.set_text( f.read() )
+        self.record_operations = True
         f.close()
         self.ui.get_widget('menu_save').set_sensitive( self.current_file!=None )
         self.ui.get_widget('toolbutton_save').set_sensitive( self.current_file!=None )
