@@ -180,8 +180,8 @@ class MainGUI:
     def init_pdf_preview_pane(self):
         file, self.tex_file = tempfile.mkstemp('.tex')
         self.pdf_file = self.tex_file[:-4]+'.pdf'
-        print 'tex_file', self.tex_file
-        print 'pdf_file', self.pdf_file
+        #print 'tex_file', self.tex_file
+        #print 'pdf_file', self.pdf_file
 
         pdf_preview = self.ui.get_widget('pdf_preview')
         self.pdf_preview = { 'current_page_number':0 }
@@ -397,7 +397,7 @@ class MainGUI:
             text_buffer = self.editor.get_buffer()
             here = text_buffer.get_iter_at_mark( text_buffer.get_insert() )
             before = text_buffer.get_text( text_buffer.get_iter_at_line(here.get_line()), here )
-            after = text_buffer.get_text( here, text_buffer.get_iter_at_line_offset(here.get_line(),here.get_chars_in_line()-1) )
+            after = text_buffer.get_text( here, text_buffer.get_iter_at_line_offset(here.get_line(),max(0,here.get_chars_in_line()-1)) )
             for s in AUTOCOMPLETE:
                 for i in range(1,len(s)):
                     if before.endswith( s[:i] ):
@@ -411,15 +411,21 @@ class MainGUI:
         except:
             traceback.print_exc()
             
-            
-    def show_recommendations(self, recommendations):
+    def get_actual_screen_coords_of_text_cursor(self):
         text_buffer = self.editor.get_buffer()
         here = text_buffer.get_iter_at_mark( text_buffer.get_insert() )
         here_location = self.editor.get_iter_location(here)
-        x,y = self.editor.translate_coordinates(self.main_window, here_location.x, here_location.y)
+        x,y = here_location.x, here_location.y
+        visible_rect = self.editor.get_visible_rect()
+        x,y = x-visible_rect.x,y-visible_rect.y
+        x,y = self.editor.translate_coordinates(self.main_window, x,y)
         main_window_position = self.main_window.get_position()
         x,y = main_window_position[0]+x, main_window_position[1]+y+12
+        return x,y
             
+            
+    def show_recommendations(self, recommendations):
+        x,y = self.get_actual_screen_coords_of_text_cursor()
         menu = gtk.Menu()
         for i,s in recommendations:
             menu_item = gtk.MenuItem(label=s.replace('\n','...'))

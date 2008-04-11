@@ -5,6 +5,10 @@ LATEX_TAGS = [
         'regex': re.compile('\$.*?\$'),
         'properties':{'foreground':'#006600',},
     }),
+    ('math2', {
+        'regex': re.compile('\$\$.*?\$\$'),
+        'properties':{'foreground':'#006600',},
+    }),
     ('command', {
         'regex': re.compile('[\\\\]\\w*[\\\\]?'),
         'properties':{'foreground':'#000088',},
