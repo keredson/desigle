@@ -173,7 +173,7 @@ class MainGUI:
                 st = buffer.get_iter_at_line(tmp) 
             et = buffer.get_iter_at_line(tmp+1)
             buffer.apply_tag_by_name( 'latex_error', st, et )
-            print line_number, st.get_offset(), et.get_offset(), error
+            #print line_number, st.get_offset(), et.get_offset(), error
         
 
 
@@ -276,7 +276,6 @@ class MainGUI:
         
         
     def highlight_errors(self, output):
-        print 'woot', self.tex_file
         self.errors = []
         for line in output.split('\n'):
             if line.startswith( self.tex_file ):
@@ -399,7 +398,6 @@ class MainGUI:
             here = text_buffer.get_iter_at_mark( text_buffer.get_insert() )
             before = text_buffer.get_text( text_buffer.get_iter_at_line(here.get_line()), here )
             after = text_buffer.get_text( here, text_buffer.get_iter_at_line_offset(here.get_line(),here.get_chars_in_line()-1) )
-            print 'before, after', before, after
             for s in AUTOCOMPLETE:
                 for i in range(1,len(s)):
                     if before.endswith( s[:i] ):
@@ -415,7 +413,6 @@ class MainGUI:
             
             
     def show_recommendations(self, recommendations):
-        print 'recommendations:', recommendations
         text_buffer = self.editor.get_buffer()
         here = text_buffer.get_iter_at_mark( text_buffer.get_insert() )
         here_location = self.editor.get_iter_location(here)
