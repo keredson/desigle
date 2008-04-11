@@ -27,7 +27,7 @@ SVN_INFO = commands.getoutput('svn info')
 VERSION = ''
 for line in SVN_INFO.split('\n'):
     if line.startswith('Revision:'):
-        VERSION = 'svn:'+ line[10:]
+        VERSION = 'v0.'+ line[10:]
 
 GPL = open( RUN_FROM_DIR + 'GPL.txt', 'r' ).read()
 
@@ -69,6 +69,9 @@ except:
 
 from latex_tags import *
 
+def pango_escape(s):
+    return s.replace('&','&amp;').replace('>','&gt;').replace('<','&lt;')
+
 
 class MainGUI:
 
@@ -99,6 +102,8 @@ class MainGUI:
         self.ui.get_widget('menu_save').connect('activate', lambda x: self.save())
         self.ui.get_widget('menu_save_as').connect('activate', lambda x: self.save_as())
         self.ui.get_widget('menu_quit').connect('activate', lambda x: self.exit())
+        self.ui.get_widget('menu_about').connect('activate', self.show_about_dialog )
+        self.ui.get_widget('menu_check_updates').connect('activate', lambda x: self.check_for_updates() )
         
         self.ui.get_widget('menu_save').set_sensitive( self.current_file!=None )
         
@@ -440,8 +445,34 @@ class MainGUI:
             time.sleep(.5)
 
 
+    def check_for_updates(self):
+        parent_self = self
+        class UpdateThread(threading.Thread):
+            def run(self):
+                os.chdir(RUN_FROM_DIR)
+                output = commands.getoutput('svn update')
+                gtk.gdk.threads_enter()
+                dialog = gtk.MessageDialog( type=gtk.MESSAGE_INFO, buttons=gtk.BUTTONS_OK )
+                dialog.connect('response', lambda x,y: dialog.destroy())
+                dialog.set_markup('<b>Output from SVN:</b>\n\n%s\n\n(restart for changes to take effect)' % ( pango_escape(output) ))
+                dialog.show_all()
+                response = dialog.run()
+                gtk.gdk.threads_leave()
+        t = UpdateThread()
+        t.start()
 
 
+    def show_about_dialog(self, o):
+        about = gtk.AboutDialog()
+        about.set_name(PROGRAM)
+        about.set_version(VERSION)
+        about.set_copyright('Copyright (c) 2008 Derek Anderson')
+        about.set_comments('''Derek's Simple Gnome LaTeX Editor''')
+        about.set_license(GPL)
+        about.set_website('http://desigle.org/')
+        about.set_authors(['Derek Anderson','http://kered.org'])
+        about.connect('response', lambda x,y: about.destroy())
+        about.show()
 
 
 

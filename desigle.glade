@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <!DOCTYPE glade-interface SYSTEM "glade-2.0.dtd">
-<!--Generated with glade3 3.4.2 on Thu Apr 10 15:55:11 2008 -->
+<!--Generated with glade3 3.4.2 on Fri Apr 11 10:54:47 2008 -->
 <glade-interface>
   <widget class="GtkWindow" id="desigle">
     <property name="width_request">800</property>
@@ -79,7 +79,14 @@
                   <widget class="GtkMenu" id="menu3">
                     <property name="visible">True</property>
                     <child>
-                      <widget class="GtkImageMenuItem" id="imagemenuitem10">
+                      <widget class="GtkMenuItem" id="menu_check_updates">
+                        <property name="visible">True</property>
+                        <property name="label" translatable="yes">Check for updates...</property>
+                        <property name="use_underline">True</property>
+                      </widget>
+                    </child>
+                    <child>
+                      <widget class="GtkImageMenuItem" id="menu_about">
                         <property name="visible">True</property>
                         <property name="label" translatable="yes">gtk-about</property>
                         <property name="use_underline">True</property>
