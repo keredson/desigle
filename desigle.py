@@ -92,6 +92,7 @@ class MainGUI:
         self.init_editor()
         self.init_tags()
         self.init_pdf_preview_pane()
+        self.init_toolbar_find()
 
         thread.start_new_thread( self.watch_editor, () )
 
@@ -106,15 +107,24 @@ class MainGUI:
         self.ui.get_widget('menu_quit').connect('activate', lambda x: self.exit())
         self.ui.get_widget('menu_about').connect('activate', self.show_about_dialog )
         self.ui.get_widget('menu_check_updates').connect('activate', lambda x: self.check_for_updates() )
+        self.ui.get_widget('menu_find').connect('activate', lambda x: self.toggle_find())
         
         self.ui.get_widget('menu_save').set_sensitive( self.current_file!=None )
         
         self.ui.get_widget('toolbutton_new').connect('clicked', lambda x: self.new())
         self.ui.get_widget('toolbutton_open').connect('clicked', lambda x: self.open())
         self.ui.get_widget('toolbutton_save').connect('clicked', lambda x: self.save())
-
         self.ui.get_widget('toolbutton_save').set_sensitive( self.current_file!=None )
 
+
+    def init_toolbar_find(self):
+        toolbar_find = self.ui.get_widget('toolbar_find')
+        toolbar_find.set_property('visible', False)
+        self.ui.get_widget('toolbutton_find_cancel').connect('clicked', lambda x: self.toggle_find())
+        self.ui.get_widget('entry_find').connect('changed', self.entry_find_changed_event )
+        self.ui.get_widget('toolbutton_find_forward').connect('clicked', lambda x: self.find_forward())
+        self.ui.get_widget('toolbutton_find_backward').connect('clicked', lambda x: self.find_backward())
+        
         
     def init_editor(self):
         self.editor = self.ui.get_widget('editor')
@@ -150,6 +160,63 @@ class MainGUI:
     
     def echo(self, a=None, b=None, c=None, d=None, e=None ):
         print 'a, b, c, d, e', a, b, c, d, e
+        
+        
+    def toggle_find(self):
+        toolbar_find = self.ui.get_widget('toolbar_find')
+        if toolbar_find.get_property('visible'):
+            toolbar_find.set_property('visible', False)
+            self.editor.grab_focus()
+            buffer = self.editor.get_buffer()
+            buffer.remove_tag_by_name('search_highlight', buffer.get_start_iter(), buffer.get_end_iter())
+        else:
+            entry_find = self.ui.get_widget('entry_find')
+            entry_find.set_text('')
+            toolbar_find.set_property('visible', True)
+            entry_find.grab_focus()
+            
+            
+    def entry_find_changed_event(self, entry_find):
+        search_text = entry_find.get_text()
+        self.find_forward(search_text)
+        
+    
+    def find_forward(self, search_text=None):
+        if search_text==None:
+            search_text = self.ui.get_widget('entry_find').get_text()
+        search_text = search_text.lower()
+        buffer = self.editor.get_buffer()
+        editor_text = buffer.get_text( buffer.get_start_iter(), buffer.get_end_iter() )
+        editor_text = editor_text.lower()
+        editor_offset = buffer.get_iter_at_mark( buffer.get_insert() ).get_offset()
+        found_offset = editor_text.find(search_text, editor_offset+1)
+        if found_offset<0:
+            found_offset = editor_text.find(search_text)
+        if found_offset>=0:
+            found_iter = buffer.get_iter_at_offset(found_offset)
+            buffer.place_cursor( found_iter )
+            self.editor.scroll_to_iter( found_iter, 0.0 )
+            buffer.remove_tag_by_name('search_highlight', buffer.get_start_iter(), buffer.get_end_iter())
+            buffer.apply_tag_by_name( 'search_highlight', found_iter, buffer.get_iter_at_offset(found_offset+len(search_text)) )
+        
+        
+    def find_backward(self, search_text=None):
+        if search_text==None:
+            search_text = self.ui.get_widget('entry_find').get_text()
+        search_text = search_text.lower()
+        buffer = self.editor.get_buffer()
+        editor_text = buffer.get_text( buffer.get_start_iter(), buffer.get_end_iter() )
+        editor_text = editor_text.lower()
+        editor_offset = buffer.get_iter_at_mark( buffer.get_insert() ).get_offset()
+        found_offset = editor_text.rfind(search_text, 0, editor_offset)
+        if found_offset<0:
+            found_offset = editor_text.rfind(search_text)
+        if found_offset>=0:
+            found_iter = buffer.get_iter_at_offset(found_offset)
+            buffer.place_cursor( found_iter )
+            self.editor.scroll_to_iter( found_iter, 0.0 )
+            buffer.remove_tag_by_name('search_highlight', buffer.get_start_iter(), buffer.get_end_iter())
+            buffer.apply_tag_by_name( 'search_highlight', found_iter, buffer.get_iter_at_offset(found_offset+len(search_text)) )
         
         
     def editor_text_change_event(self, buffer):

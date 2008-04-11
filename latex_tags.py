@@ -33,6 +33,10 @@ LATEX_TAGS = [
         'regex': re.compile('oZooxae4'), # dummy regex
         'properties':{'background':'#ffdddd',},
     }),
+    ('search_highlight', {
+        'regex': re.compile('oZooxae4'), # dummy regex
+        'properties':{'background':'#ffffbb',},
+    }),
 ]
 
 
