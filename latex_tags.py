@@ -26,9 +26,31 @@ LATEX_TAGS = [
         'properties':{'foreground':'#888800',},
     }),
     ('latex_error', {
-        'regex': re.compile('oZooxae4'),
+        'regex': re.compile('oZooxae4'), # dummy regex
         'properties':{'background':'#ffdddd',},
     }),
+]
+
+
+AUTOCOMPLETE = [
+    '\\begin{}\n\\end{}',
+    '\\begin{document}\n\\end{document}',
+    '\\begin{comment}\n\\end{comment}',
+    '\\begin{quote}\n\\end{quote}',
+    '\\begin{quotation}\n\\end{quotation}',
+    '\\begin{verse}\n\\end{verse}',
+    '\\begin{enumerate}\n\\item\n\\end{enumerate}',
+    '\\begin{itemize}\n\\item\n\\end{itemize}',
+    '\\begin{description}\n\\item[]\n\\end{description}',
+    '\\begin{table}\n\\end{table}',
+    '\\begin{figure}\n\\end{figure}',
+    '\\begin{equation}\n\\end{equation}',
+    '\\begin{verbatim}\n\\end{verbatim}',
+    '\\begin{center}\n\\end{center}',
+    '\\begin{flushleft}\n\\end{flushleft}',
+    '\\begin{flushright}\n\\end{flushright}',
+    '\\begin{array}\n\\end{array}',
+    '\\begin{tabular}\n\\end{tabular}',
 ]
 
 

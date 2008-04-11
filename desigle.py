@@ -148,6 +148,7 @@ class MainGUI:
     
         
     def retag( self, buffer, start, end ):
+        # tag syntax highlighting
         for tag_name, tag_attr in LATEX_TAGS:
             #buffer.remove_tag_by_name(tag_name, start, end)
             buffer.remove_tag_by_name(tag_name, buffer.get_start_iter(), buffer.get_end_iter())
@@ -158,7 +159,7 @@ class MainGUI:
                 st = buffer.get_iter_at_offset( start.get_offset()+ match.span()[0] )
                 et = buffer.get_iter_at_offset( start.get_offset()+ match.span()[1] )
                 buffer.apply_tag_by_name( tag_name, st, et )
-        
+        # tag errors
         for line_number, error in self.errors:
             tmp = line_number-1
             st = buffer.get_iter_at_line(tmp)
@@ -386,16 +387,62 @@ class MainGUI:
         output = child_stdout.read()
         child_stdout.close()
         
+    def check_for_autocomplete_patterns(self):
+        try:
+            recommendations = []
+            text_buffer = self.editor.get_buffer()
+            here = text_buffer.get_iter_at_mark( text_buffer.get_insert() )
+            before = text_buffer.get_text( text_buffer.get_iter_at_line(here.get_line()), here )
+            after = text_buffer.get_text( here, text_buffer.get_iter_at_line_offset(here.get_line(),here.get_chars_in_line()-1) )
+            print 'before, after', before, after
+            for s in AUTOCOMPLETE:
+                for i in range(1,len(s)):
+                    if before.endswith( s[:i] ):
+                        if not after.startswith( s[i:i+3] ):
+                            recommendations.append((i,s))
+                            break
+            if recommendations:
+                self.show_recommendations(recommendations)
+                self.changed_time = None
+                return False
+        except:
+            traceback.print_exc()
+            
+            
+    def show_recommendations(self, recommendations):
+        print 'recommendations:', recommendations
+        text_buffer = self.editor.get_buffer()
+        here = text_buffer.get_iter_at_mark( text_buffer.get_insert() )
+        here_location = self.editor.get_iter_location(here)
+        x,y = self.editor.translate_coordinates(self.main_window, here_location.x, here_location.y)
+        main_window_position = self.main_window.get_position()
+        x,y = main_window_position[0]+x, main_window_position[1]+y+12
+            
+        menu = gtk.Menu()
+        for i,s in recommendations:
+            menu_item = gtk.MenuItem(label=s.replace('\n','...'))
+            menu_item.connect( 'activate', lambda x,i,s: self.editor.get_buffer().insert_at_cursor(s[i:]), i, s )
+            menu.append(menu_item)
+        menu.show_all()
+        menu.popup(None, None, None, 0, 0)
+        menu.get_parent_window().move( x, y )
+        
     
     def watch_editor(self):
         while True:
             if self.changed_time and (datetime.now() - self.changed_time).seconds >= 1:
                 gtk.gdk.threads_enter()
-                text_buffer = self.editor.get_buffer()
-                self.refresh_preview()
-                self.retag( text_buffer, text_buffer.get_start_iter(), text_buffer.get_end_iter() )
+                if not self.check_for_autocomplete_patterns():
+                    text_buffer = self.editor.get_buffer()
+                    self.refresh_preview()
+                    self.retag( text_buffer, text_buffer.get_start_iter(), text_buffer.get_end_iter() )
                 gtk.gdk.threads_leave()
             time.sleep(.5)
+
+
+
+
+
 
 
 if __name__ == "__main__":
