@@ -90,6 +90,7 @@ class MainGUI:
         
         self.init_menu()
         self.init_editor()
+        self.init_editor_errors()
         self.init_tags()
         self.init_pdf_preview_pane()
         self.init_toolbar_find()
@@ -156,7 +157,33 @@ class MainGUI:
         redo_action.connect_proxy(self.ui.get_widget('menu_redo'))
         self.ui.get_widget('menu_undo').set_sensitive(False)
         self.ui.get_widget('menu_redo').set_sensitive(False)
+
+
+    def init_editor_errors(self):
+        self.treeview_errors = self.ui.get_widget('treeview_errors')
+        # icon, line_number, error
+        self.treeview_errors_model = gtk.ListStore( gtk.gdk.Pixbuf, int, str )
+        self.treeview_errors.set_model( self.treeview_errors_model )
+
+        column = gtk.TreeViewColumn()
+        self.treeview_errors.append_column(column)
+        renderer = gtk.CellRendererPixbuf()
+        column.pack_start(renderer, expand=False)
+        column.add_attribute(renderer, 'pixbuf', 0)
+        self.treeview_errors.append_column( gtk.TreeViewColumn("", gtk.CellRendererText(), text=1) )
+        self.treeview_errors.append_column( gtk.TreeViewColumn("", gtk.CellRendererText(), text=2) )
         
+        self.treeview_errors.get_selection().connect('changed', self.handle_errors_selection_changed )
+        
+    
+    def handle_errors_selection_changed(self, selection):
+        liststore, iter = selection.get_selected()
+        if not iter: return
+        line_number = liststore[iter][1]
+        buffer = self.editor.get_buffer()
+        found_iter = buffer.get_iter_at_line(line_number)
+        self.editor.scroll_to_iter( found_iter, 0.1 )
+
     
     def echo(self, a=None, b=None, c=None, d=None, e=None ):
         print 'a, b, c, d, e', a, b, c, d, e
@@ -410,6 +437,14 @@ class MainGUI:
                 line_number = int( line[ len(self.tex_file)+1 : line.find(':', line.find(':')+1) ] )
                 line = line[ line.find(':', line.find(':')+1)+1 :]
                 self.errors.append( ( line_number, line ) )
+            
+        try:
+            self.treeview_errors_model.clear()
+            self.treeview_errors.set_property('visible', bool(self.errors) )
+            for error in self.errors:
+                self.treeview_errors_model.append( (self.editor.render_icon(gtk.STOCK_CANCEL, gtk.ICON_SIZE_MENU), error[0], error[1]) )
+        except:
+            traceback.print_exc()
 
 
     def refresh_preview(self):
@@ -636,7 +671,6 @@ class MainGUI:
         about.set_authors(['Derek Anderson','http://kered.org'])
         about.connect('response', lambda x,y: about.destroy())
         about.show()
-
 
 
 if __name__ == "__main__":
