@@ -270,6 +270,8 @@ AUTOCOMPLETE = [
     '\\underbrace',
     '\\underline',
     '\\vdots',
+    '\\item',
+    '\\item[]',
 ]
 
 
