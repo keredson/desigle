@@ -435,6 +435,32 @@ class MainGUI:
         self.changed_time = None
         
     def exit(self):
+        
+        if self.changed:
+    
+            dialog = gtk.MessageDialog( type=gtk.MESSAGE_WARNING )
+            if self.current_file:
+                dialog.set_markup('<b>Save changes to document "%s" before closing?</b>\n\nIf you don\'t save, changes will be lost.' % ( pango_escape(os.path.basename(self.current_file)) ))
+                dialog.add_button('_Save', 1)
+            else:
+                dialog.set_markup('<b>Save untitled document before closing?</b>\n\nIf you don\'t save, changes will be lost.')
+                dialog.add_button('_Save as', 1)
+            dialog.add_button('Close _without saving', 2)
+            dialog.add_button('_Cancel', 3)
+            dialog.show_all()
+            response = dialog.run()
+            dialog.destroy()
+            if response==1:
+                if self.current_file:
+                    self.save()
+                else:
+                    if not self.save_as():
+                        return True
+            elif response==2:
+                pass
+            elif response==3:
+                return True
+        
         if os.path.isfile( self.tex_file ): os.remove( self.tex_file )
         if os.path.isfile( self.pdf_file ): os.remove( self.pdf_file )
         sys.exit(0)
@@ -496,7 +522,11 @@ class MainGUI:
             CURRENT_DIR = dialog.get_current_folder()
             self.current_file = dialog.get_filename()
             self.save()
-        dialog.destroy()
+            dialog.destroy()
+            return True
+        else:
+            dialog.destroy()
+        return False
         
     
     def save(self):
