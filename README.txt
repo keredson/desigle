@@ -10,6 +10,10 @@ version of Ubuntu, this line will install them all:
 
     sudo apt-get install python python-glade2 python-gnome2 python-gconf python-gnome2-extras
     
+And (obviously) the LaTeX utilities:
+
+    sudo apt-get install texlive-latex-base texlive-base-bin texlive-latex-extra
+
 You will also need pypoppler (for the PDF integration), which can be installed
 with the following set of commands (again assuming Ubuntu):
 
