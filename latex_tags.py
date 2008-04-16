@@ -1,4 +1,7 @@
-import pango, re
+import os, pango, re, sys
+
+RUN_FROM_DIR = os.path.abspath(os.path.dirname(sys.argv[0])) + '/'
+
 
 LATEX_TAGS = [
     ('math', {
@@ -273,6 +276,12 @@ AUTOCOMPLETE = [
     '\\item',
     '\\item[]',
 ]
+
+SYMLIST = [ x.strip() for x in open( RUN_FROM_DIR + 'SYMLIST', 'r' ).readlines() ]
+
+#AUTOCOMPLETE_PLUS = list( set(AUTOCOMPLETE).union( set(SYMLIST) ) )
+AUTOCOMPLETE_PLUS = list( set(AUTOCOMPLETE) )
+AUTOCOMPLETE_PLUS.sort()
 
 
 BLANK_DOCUMENT = """\\documentclass{article}

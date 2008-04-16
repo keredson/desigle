@@ -17,7 +17,7 @@
 #    with this program; if not, write to the Free Software Foundation, Inc.,
 #    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-import commands, dircache, getopt, math, os, re, string, sys, tempfile, thread, threading, time, traceback
+import commands, dircache, getopt, math, pickle, os, re, string, sys, tempfile, thread, threading, time, traceback
 from datetime import date, datetime, timedelta
 
 RUN_FROM_DIR = os.path.abspath(os.path.dirname(sys.argv[0])) + '/'
@@ -42,6 +42,7 @@ try:
     import gnome
     import gnome.ui
     import pango
+    import gconf
     gobject.threads_init()
     gtk.gdk.threads_init()
 except:
@@ -75,12 +76,15 @@ def pango_escape(s):
 
 class MainGUI:
 
+    config = None
+        
     current_file = None
     changed_time = None
     changed = False
     errors = []
     undo_stack = []
     record_operations = True
+    recent_files = []
 
     def __init__(self):
         gnome.init(PROGRAM, VERSION)
@@ -88,6 +92,8 @@ class MainGUI:
         self.main_window = self.ui.get_widget('desigle')
         self.main_window.connect("delete-event", lambda x,y: self.exit() )
         
+        self.config = GConfConfig()
+
         self.init_menu()
         self.init_editor()
         self.init_editor_errors()
@@ -116,6 +122,18 @@ class MainGUI:
         self.ui.get_widget('toolbutton_open').connect('clicked', lambda x: self.open())
         self.ui.get_widget('toolbutton_save').connect('clicked', lambda x: self.save())
         self.ui.get_widget('toolbutton_save').set_sensitive( self.current_file!=None )
+        
+        menuitem_recent_files = self.ui.get_widget('menuitem_recent_files')
+        self.recent_files = self.config.get_list('recent_files')
+        if not self.recent_files: self.recent_files = []
+        menu = gtk.Menu()
+        for recent_file in self.recent_files:
+            menu_item = gtk.MenuItem(label=recent_file)
+            menu_item.connect( 'activate', lambda x,recent_file: self.open_file(recent_file), recent_file )
+            menu.append(menu_item)
+        menu.show_all()
+        menuitem_recent_files.set_submenu(menu)
+        
 
 
     def init_toolbar_find(self):
@@ -495,6 +513,10 @@ class MainGUI:
                 pass
             elif response==3:
                 return True
+            
+        if len(self.recent_files)>10:
+            self.recent_files = self.recent_files[:10]
+        self.config.set_list('recent_files', self.recent_files)
         
         if os.path.isfile( self.tex_file ): os.remove( self.tex_file )
         if os.path.isfile( self.pdf_file ): os.remove( self.pdf_file )
@@ -529,6 +551,11 @@ class MainGUI:
         if not os.path.isfile(filename):
             self.new()
             return
+        
+        while filename in self.recent_files:
+            self.recent_files.remove(filename)
+        self.recent_files.insert(0,filename)
+        
         text_buffer = self.editor.get_buffer()
         self.current_file = filename
         f = open( self.current_file )
@@ -593,7 +620,7 @@ class MainGUI:
             here = text_buffer.get_iter_at_mark( text_buffer.get_insert() )
             before = text_buffer.get_text( text_buffer.get_iter_at_line(here.get_line()), here )
             after = text_buffer.get_text( here, text_buffer.get_iter_at_line_offset(here.get_line(),max(0,here.get_chars_in_line()-1)) )
-            for s in AUTOCOMPLETE:
+            for s in AUTOCOMPLETE_PLUS:
                 for i in range(1,len(s)):
                     if before.endswith( s[:i] ):
                         if not after.startswith( s[i:i+3] ):
@@ -671,6 +698,51 @@ class MainGUI:
         about.set_authors(['Derek Anderson','http://kered.org'])
         about.connect('response', lambda x,y: about.destroy())
         about.show()
+
+
+class GConfConfig:
+    
+    BASE_KEY = "/apps/desigle"
+
+    def get_string(self, key, default=None):
+        x = self.client.get_string(self.BASE_KEY +'/'+ key)
+        if x:
+            return x
+        else:
+            return default
+
+    def set_string(self, key, value):
+        self.client.set_string(self.BASE_KEY +'/'+ key,value)
+        
+    def get_list(self, key, default=[]):
+        x = self.client.get_string(self.BASE_KEY +'/'+ key)
+        if x:
+            return pickle.loads(x)
+        else:
+            return default
+    
+    def set_list(self, key, values):
+        self.client.set_string( self.BASE_KEY +'/'+ key, pickle.dumps(values) ) 
+    
+    def get_bool(self, key):
+        return self.client.get_bool(self.BASE_KEY +'/'+ key)
+    
+    def set_bool(self, key, value):
+        self.client.set_bool(self.BASE_KEY +'/'+ key,value)
+
+    def get_int(self, key, default=0):
+        x = self.client.get_int(self.BASE_KEY +'/'+ key)
+        if x!=None:
+            return x
+        else:
+            return default
+    
+    def set_int(self, key, value):
+        self.client.set_int(self.BASE_KEY +'/'+ key, value)
+
+    def __init__(self):
+        self.client = gconf.client_get_default()
+        self.client.add_dir (self.BASE_KEY, gconf.CLIENT_PRELOAD_NONE)
 
 
 if __name__ == "__main__":

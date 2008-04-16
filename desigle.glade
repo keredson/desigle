@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <!DOCTYPE glade-interface SYSTEM "glade-2.0.dtd">
-<!--Generated with glade3 3.4.2 on Mon Apr 14 11:45:00 2008 -->
+<!--Generated with glade3 3.4.2 on Wed Apr 16 10:53:16 2008 -->
 <glade-interface>
   <widget class="GtkWindow" id="desigle">
     <property name="width_request">800</property>
@@ -51,6 +51,18 @@
                         <property name="label" translatable="yes">gtk-save-as</property>
                         <property name="use_underline">True</property>
                         <property name="use_stock">True</property>
+                      </widget>
+                    </child>
+                    <child>
+                      <widget class="GtkSeparatorMenuItem" id="separatormenuitem2">
+                        <property name="visible">True</property>
+                      </widget>
+                    </child>
+                    <child>
+                      <widget class="GtkMenuItem" id="menuitem_recent_files">
+                        <property name="visible">True</property>
+                        <property name="label" translatable="yes">Recent Files</property>
+                        <property name="use_underline">True</property>
                       </widget>
                     </child>
                     <child>
