@@ -19,6 +19,7 @@
 
 import commands, dircache, getopt, math, pickle, os, re, string, sys, tempfile, thread, threading, time, traceback
 from datetime import date, datetime, timedelta
+import config
 
 RUN_FROM_DIR = os.path.abspath(os.path.dirname(sys.argv[0])) + '/'
 CURRENT_DIR = os.path.expanduser("~")
@@ -76,7 +77,7 @@ def pango_escape(s):
 
 class MainGUI:
 
-    config = None
+    config = config.GConfConfig('/apps/desigle')
         
     current_file = None
     changed_time = None
@@ -92,8 +93,6 @@ class MainGUI:
         self.main_window = self.ui.get_widget('desigle')
         self.main_window.connect("delete-event", lambda x,y: self.exit() )
         
-        self.config = GConfConfig()
-
         self.init_menu()
         self.init_editor()
         self.init_editor_errors()
@@ -115,6 +114,7 @@ class MainGUI:
         self.ui.get_widget('menu_about').connect('activate', self.show_about_dialog )
         self.ui.get_widget('menu_check_updates').connect('activate', lambda x: self.check_for_updates() )
         self.ui.get_widget('menu_find').connect('activate', lambda x: self.toggle_find())
+        self.ui.get_widget('menuitem_preferences').connect('activate', lambda x: PrefGUI())
         
         self.ui.get_widget('menu_save').set_sensitive( self.current_file!=None )
         
@@ -525,7 +525,7 @@ class MainGUI:
 
     def new(self):
         text_buffer = self.editor.get_buffer()
-        text_buffer.set_text(BLANK_DOCUMENT)
+        text_buffer.set_text( self.config.get_string( 'default_blank_document', default=BLANK_DOCUMENT ) )
         self.ui.get_widget('menu_save').set_sensitive( self.current_file!=None )
         self.ui.get_widget('toolbutton_save').set_sensitive( self.current_file!=None )
         self.main_window.set_title( PROGRAM +' - untitled' )
@@ -702,49 +702,25 @@ class MainGUI:
         about.show()
 
 
-class GConfConfig:
+class PrefGUI:
     
-    BASE_KEY = "/apps/desigle"
-
-    def get_string(self, key, default=None):
-        x = self.client.get_string(self.BASE_KEY +'/'+ key)
-        if x:
-            return x
-        else:
-            return default
-
-    def set_string(self, key, value):
-        self.client.set_string(self.BASE_KEY +'/'+ key,value)
-        
-    def get_list(self, key, default=[]):
-        x = self.client.get_string(self.BASE_KEY +'/'+ key)
-        if x:
-            return pickle.loads(x)
-        else:
-            return default
+    config = config.GConfConfig('/apps/desigle')
     
-    def set_list(self, key, values):
-        self.client.set_string( self.BASE_KEY +'/'+ key, pickle.dumps(values) ) 
-    
-    def get_bool(self, key):
-        return self.client.get_bool(self.BASE_KEY +'/'+ key)
-    
-    def set_bool(self, key, value):
-        self.client.set_bool(self.BASE_KEY +'/'+ key,value)
-
-    def get_int(self, key, default=0):
-        x = self.client.get_int(self.BASE_KEY +'/'+ key)
-        if x!=None:
-            return x
-        else:
-            return default
-    
-    def set_int(self, key, value):
-        self.client.set_int(self.BASE_KEY +'/'+ key, value)
-
     def __init__(self):
-        self.client = gconf.client_get_default()
-        self.client.add_dir (self.BASE_KEY, gconf.CLIENT_PRELOAD_NONE)
+        self.ui = gtk.glade.XML(RUN_FROM_DIR + 'desigle.glade')
+        self.main_window = self.ui.get_widget('desigle_prefs')
+        self.main_window.show_all()
+        self.main_window.connect("delete-event", lambda x,y: self.main_window.destroy() )
+        self.ui.get_widget('button_close').connect('clicked', lambda x: self.main_window.destroy() )
+        
+        textview_default_blank_document = self.ui.get_widget('textview_default_blank_document')
+        textview_default_blank_document.get_buffer().set_text( self.config.get_string( 'default_blank_document', default=BLANK_DOCUMENT ) )
+        textview_default_blank_document.get_buffer().connect('changed', self.save_default_blank_document  )
+        self.ui.get_widget('toolbutton_revert_to_default').connect( 'clicked', lambda x: self.ui.get_widget('textview_default_blank_document').get_buffer().set_text( BLANK_DOCUMENT ) )
+
+    def save_default_blank_document(self, buffer):
+        default_blank_document = buffer.get_text( buffer.get_start_iter(), buffer.get_end_iter() )
+        self.config.set_string( 'default_blank_document', default_blank_document )
 
 
 if __name__ == "__main__":
