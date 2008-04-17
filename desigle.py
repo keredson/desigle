@@ -600,6 +600,8 @@ class MainGUI:
         self.changed = False
         self.main_window.set_title( PROGRAM +' - '+ self.current_file )
         self.save_pdf()
+        self.ui.get_widget('menu_save').set_sensitive( self.current_file!=None )
+        self.ui.get_widget('toolbutton_save').set_sensitive( self.current_file!=None )
         
     
     def save_pdf(self):
