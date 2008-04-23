@@ -17,12 +17,13 @@
 #    with this program; if not, write to the Free Software Foundation, Inc.,
 #    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-import commands, dircache, getopt, math, pickle, os, re, string, sys, tempfile, thread, threading, time, traceback
+import commands, dircache, getopt, math, pickle, os, re, shutil, string, sys, tempfile, thread, threading, time, traceback
 from datetime import date, datetime, timedelta
 import config
 
 RUN_FROM_DIR = os.path.abspath(os.path.dirname(sys.argv[0])) + '/'
-CURRENT_DIR = os.path.expanduser("~")
+#CURRENT_DIR = os.path.expanduser("~")
+CURRENT_DIR = os.getcwd()
 PROGRAM = 'DeSiGLE'
 SVN_INFO = commands.getoutput('svn info')
 VERSION = ''
@@ -473,9 +474,23 @@ class MainGUI:
         ftex = open( self.tex_file, 'w' )
         ftex.write( tex )
         ftex.close()
-        
+
+        #symlink included files to /tmp
+        DOC_DIR = os.path.dirname(self.current_file)
+        local_files = os.listdir(DOC_DIR)
+        print 'local_files', local_files
+        p = re.compile('\\include[a-z]*[{](.*?)[}]')
+        include_files = [ match.group(1) for match in p.finditer(tex) ]
+        print 'include_files', include_files
+        for fname in local_files:
+            if fname.rfind('.')>0:
+                fname_base = fname[:fname.rfind('.')]
+            if fname in include_files or fname_base in include_files:
+                print fname, os.path.join('/','tmp', fname)
+                os.popen('ln -sf "%s" /tmp/' % os.path.join(DOC_DIR, fname) ).close()
+
         os.chdir('/tmp')
-        child_stdin, child_stdout = os.popen2( 'pdflatex -file-line-error-style -src-specials -halt-on-error "%s"' % self.tex_file )
+        child_stdin, child_stdout = os.popen2( 'pdflatex -file-line-error-style -src-specials -halt-on-error "%s"' % (self.tex_file) )
         child_stdin.close()
         output = child_stdout.read()
         child_stdout.close()
@@ -551,7 +566,7 @@ class MainGUI:
         if not os.path.isfile(filename):
             self.new()
             return
-        
+        filename = os.path.abspath(filename)
         while filename in self.recent_files:
             self.recent_files.remove(filename)
         self.recent_files.insert(0,filename)
