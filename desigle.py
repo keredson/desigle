@@ -313,7 +313,7 @@ class MainGUI:
 
     def editor_mark_set_event(self, buffer, x, y):
         iter=buffer.get_iter_at_mark(buffer.get_insert())
-        self.ui.get_widget('label_row_col').set_text( 'line:%i/%i col:%i/%i' % ( iter.get_line(), buffer.get_line_count(), iter.get_line_offset(), iter.get_chars_in_line() ) )
+        self.ui.get_widget('label_row_col').set_text( 'line:%i/%i col:%i/%i' % ( iter.get_line()+1, buffer.get_line_count(), iter.get_line_offset(), iter.get_chars_in_line() ) )
         
     
     def init_tags(self):
@@ -451,11 +451,12 @@ class MainGUI:
         
     def highlight_errors(self, output):
         self.errors = []
+        p = re.compile('(.+):([0-9]+):(.*)')
         for line in output.split('\n'):
-            if line.startswith( self.tex_file ):
-                line_number = int( line[ len(self.tex_file)+1 : line.find(':', line.find(':')+1) ] )
-                line = line[ line.find(':', line.find(':')+1)+1 :]
-                self.errors.append( ( line_number, line ) )
+            if line.startswith('! LaTeX Error:'):
+                self.errors.append( ( 0, line ) )
+            for match in p.finditer(line):
+                    self.errors.append( ( int(match.group(2)), match.group(3) ) )
             
         try:
             self.treeview_errors_model.clear()
@@ -478,19 +479,19 @@ class MainGUI:
         #symlink included files to /tmp
         DOC_DIR = os.path.dirname(self.current_file)
         local_files = os.listdir(DOC_DIR)
-        print 'local_files', local_files
         p = re.compile('\\include[a-z]*[{](.*?)[}]')
         include_files = [ match.group(1) for match in p.finditer(tex) ]
-        print 'include_files', include_files
+        p = re.compile('\\input[a-z]*[{](.*?)[}]')
+        include_files.extend( [ match.group(1) for match in p.finditer(tex) ] )
         for fname in local_files:
             if fname.rfind('.')>0:
                 fname_base = fname[:fname.rfind('.')]
             if fname in include_files or fname_base in include_files:
-                print fname, os.path.join('/','tmp', fname)
+                #print fname, os.path.join('/','tmp', fname)
                 os.popen('ln -sf "%s" /tmp/' % os.path.join(DOC_DIR, fname) ).close()
 
         os.chdir('/tmp')
-        child_stdin, child_stdout = os.popen2( 'pdflatex -file-line-error-style -src-specials -halt-on-error "%s"' % (self.tex_file) )
+        child_stdin, child_stdout = os.popen2( 'pdflatex -file-line-error -src-specials -halt-on-error "%s"' % (self.tex_file) )
         child_stdin.close()
         output = child_stdout.read()
         child_stdout.close()
@@ -662,10 +663,17 @@ class MainGUI:
         x,y = main_window_position[0]+x, main_window_position[1]+y+12
         return x,y
             
+    def recommendation_menu_key_press_event(self, menu, event):
+        if event.keyval in [65288, 65535]:
+            menu.destroy()
+        if event.string and event.keyval<256:
+            self.editor.get_buffer().insert_at_cursor(event.string)
+            menu.destroy()
             
     def show_recommendations(self, recommendations):
         x,y = self.get_actual_screen_coords_of_text_cursor()
         menu = gtk.Menu()
+        menu.connect('key-press-event', self.recommendation_menu_key_press_event)
         for i,s in recommendations:
             menu_item = gtk.MenuItem(label=s.replace('\n','...'))
             menu_item.connect( 'activate', lambda x,i,s: self.editor.get_buffer().insert_at_cursor(s[i:]), i, s )

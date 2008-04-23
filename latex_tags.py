@@ -97,7 +97,6 @@ AUTOCOMPLETE = [
     '\\pagebreak',
     '\\noindent',
     '\\today',
-    '$\\sim$',
     '\\hspace{l}',
     '\\vspace{l}',
     '\\rule{w}{h}',
