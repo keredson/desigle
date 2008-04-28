@@ -87,6 +87,7 @@ class TexDocument:
     undo_stack = []
     record_operations = True
     editor = None
+    error_line_offset = 0
     
     def __init__(self, main_gui, filename=None):
         self.main_gui = main_gui
@@ -653,7 +654,8 @@ class MainGUI:
             if line.startswith('! LaTeX Error:'):
                 self.errors.append( ( 'LaTeX Error', 0, line ) )
             for match in p.finditer(line):
-                    self.errors.append( ( match.group(1), int(match.group(2)), match.group(3) ) )
+                error_line = self.error_line_offset + int(match.group(2))
+                self.errors.append( ( match.group(1), error_line, match.group(3) ) )
             
         try:
             self.treeview_errors_model.clear()
@@ -670,6 +672,12 @@ class MainGUI:
         if not self.tex_docs: return
         text_buffer = self.get_current_tex_doc().editor.get_buffer()
         tex = text_buffer.get_text( text_buffer.get_start_iter(), text_buffer.get_end_iter() )
+        if self.config.get_bool( 'pref_auto_add_doc_tags_in_preview') and tex.find('\\documentclass')==-1:
+            tex = '\\documentclass{%s}\n\\begin{document}\n' % self.config.get_string( 'default_doc_class', default='article' ) \
+                + tex + '\n\\end{document}\n'
+            self.error_line_offset = -2
+        else:
+            self.error_line_offset = 0
         ftex = open( self.tex_file, 'w' )
         ftex.write( tex )
         ftex.close()
@@ -853,10 +861,23 @@ class PrefGUI:
         self.main_window.connect("delete-event", lambda x,y: self.main_window.destroy() )
         self.ui.get_widget('button_close').connect('clicked', lambda x: self.main_window.destroy() )
         
+        # blank document
         textview_default_blank_document = self.ui.get_widget('textview_default_blank_document')
         textview_default_blank_document.get_buffer().set_text( self.config.get_string( 'default_blank_document', default=BLANK_DOCUMENT ) )
         textview_default_blank_document.get_buffer().connect('changed', self.save_default_blank_document  )
         self.ui.get_widget('toolbutton_revert_to_default').connect( 'clicked', lambda x: self.ui.get_widget('textview_default_blank_document').get_buffer().set_text( BLANK_DOCUMENT ) )
+
+        # pdf preview
+        pref_auto_add_doc_tags_in_preview = self.ui.get_widget('pref_auto_add_doc_tags_in_preview')
+        pref_auto_add_doc_tags_in_preview.set_active( self.config.get_bool( 'pref_auto_add_doc_tags_in_preview') )
+        pref_auto_add_doc_tags_in_preview.connect('toggled', lambda x: self.config.set_bool( 'pref_auto_add_doc_tags_in_preview', pref_auto_add_doc_tags_in_preview.get_active()) )
+        pref_keep_preview_on_parent = self.ui.get_widget('pref_keep_preview_on_parent')
+        pref_keep_preview_on_parent.set_active( self.config.get_bool( 'pref_keep_preview_on_parent') )
+        pref_keep_preview_on_parent.connect('toggled', lambda x: self.config.set_bool( 'pref_keep_preview_on_parent', pref_keep_preview_on_parent.get_active()) )
+        pref_default_doc_class = self.ui.get_widget('pref_default_doc_class')
+        pref_default_doc_class.set_text( self.config.get_string( 'default_doc_class', default='article' ) )
+        pref_default_doc_class.connect('changed', lambda x: self.config.set_string( 'default_doc_class', pref_default_doc_class.get_text()) )
+        self.ui.get_widget('reset_pref_default_doc_class').connect( 'clicked', lambda x: self.ui.get_widget('pref_default_doc_class').set_text( 'article' ) )
 
     def save_default_blank_document(self, buffer):
         default_blank_document = buffer.get_text( buffer.get_start_iter(), buffer.get_end_iter() )
