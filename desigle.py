@@ -182,6 +182,7 @@ class TexDocument:
     def init_editor(self):
         self.scrolled_window = gtk.ScrolledWindow()
         self.editor = gtk.TextView()
+        self.editor.set_wrap_mode(gtk.WRAP_WORD)
         self.scrolled_window.add(self.editor)
         self.notebook.append_page(self.scrolled_window)
         self.scrolled_window.show_all()
