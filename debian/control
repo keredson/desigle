@@ -1,0 +1,13 @@
+Source: desigle
+Section: editors
+Priority: extra
+Maintainer: Derek Anderson <public@kered.org>
+Build-Depends: debhelper (>= 7)
+Standards-Version: 3.8.0
+Homepage: http://desigle.org/
+
+Package: desigle
+Architecture: all
+Depends: ${shlibs:Depends}, ${misc:Depends}, python-poppler, python, python-glade2, python-gnome2, python-gconf, python-gnome2-extras, texlive-latex-base, texlive-base-bin, texlive-latex-extra
+Description: Derek's Simple Gnome/GTK LaTeX Editor
+    I wanted a simple GTK-based LaTeX editor with spell checking, syntax highlighting, auto-completion and a PDF preview pane. None that I could find fit this bill, so I rolled my own. 
