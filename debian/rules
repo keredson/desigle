@@ -42,6 +42,7 @@ install: build
 	# Add here commands to install the package into debian/desigle.
 	#$(MAKE) DESTDIR=$(CURDIR)/debian/desigle install
 	svn export --force http://desigle.googlecode.com/svn/trunk/ $(CURDIR)/debian/desigle/usr/share/desigle
+	rm -R $(CURDIR)/debian/desigle/usr/share/desigle/debs $(CURDIR)/debian/desigle/usr/share/desigle/debian
 
 
 # Build architecture-independent files here.
