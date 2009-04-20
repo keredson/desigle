@@ -694,6 +694,8 @@ class MainGUI:
             for fname in local_files:
                 if fname.rfind('.')>0:
                     fname_base = fname[:fname.rfind('.')]
+                else:
+                    fname_base = ''
                 if fname in include_files or fname_base in include_files:
                     #print fname, os.path.join('/','tmp', fname)
                     os.popen('ln -sf "%s" /tmp/' % os.path.join(DOC_DIR, fname) ).close()
