@@ -322,7 +322,8 @@ class TexDocument:
         response = dialog.run()
         if response == gtk.RESPONSE_OK:
             CURRENT_DIR = dialog.get_current_folder()
-            self.tq_filename = dialog.get_filename()
+            self.fq_filename = dialog.get_filename()
+            self.notebook_label.set_text( pango_escape(os.path.basename(self.fq_filename)) )
             self.save()
             dialog.destroy()
             return True
